@@ -40,13 +40,12 @@ def solve(board):
             board[r][c] = current[0]
             propagate(r, c, current[0], solutions)
         if len(current) == 2:
-            pairs = propergate_pairs(solutions, index)
-            print("first pair: ", pairs, " values: ", solutions[pairs[0][0]], ", ", solutions[pairs[0][1]])
-            b = False
-            print("Failure: Too many solutions")
-
-            
+            pairs = propagate_pairs(solutions, index)
+            if pairs != []:
+                print("first pair: ", pairs, " values: ", solutions[pairs[0]], ", ", solutions[pairs[1]])
+            print("Failure: Too many solutions")       
         else:
+            print(solutions)
             b = False
 
     return board
@@ -93,13 +92,39 @@ def propagate(r, c, element, solutions):
         # Column
         solutions[9*i+c] = remove(element, solutions[9*i+c])
 
+        # Box
+        box_r_start = (r // 3) * 3
+        box_c_start = (c // 3) * 3
+        for box_r in range(box_r_start, box_r_start + 3):
+            for box_c in range(box_c_start, box_c_start + 3):
+                solutions[9 * box_r + box_c] = remove(element, solutions[9 * box_r + box_c])
+
+    return solutions
+
+
+def propagate_row(r, c, element, solutions):
+    for i in range(9):
+        # Row
+        if i != c:
+            solutions[9*r+i] = remove(element, solutions[9*r+i])
+
+
+def propagate_col(r, c, element, solutions):
+    for i in range(9):
+        # Row
+        if i != r:
+            solutions[9*i+c] = remove(element, solutions[9*i+c])
+
+
+def propagate_box(r, c, element, solutions):
     # Box
     box_r_start = (r // 3) * 3
     box_c_start = (c // 3) * 3
     for box_r in range(box_r_start, box_r_start + 3):
         for box_c in range(box_c_start, box_c_start + 3):
-            solutions[9 * box_r + box_c] = remove(element, solutions[9 * box_r + box_c])
-
+            if box_r != r and box_c != c:
+                solutions[9 * box_r + box_c] = remove(element, solutions[9 * box_r + box_c])
+    
     return solutions
 
 
@@ -112,7 +137,7 @@ def hidden_singles(solutions):
     return 0
 
 
-def propergate_pairs (solutions, index=0):
+def propagate_pairs (solutions, index=0):
     """
     Find a pair of indexes that have a similar pair of solutions, 
     then propergate the removal of those solutions
@@ -128,25 +153,38 @@ def propergate_pairs (solutions, index=0):
             row_end = ((i // 9) + 1) * 9
             for j in range(i + 1, row_end):
                 if solutions[i] == solutions[j]:
-                    pairs.append([i,j])
+                    pairs = [i,j]
+                    for e in solutions[i]:
+                        propagate_row(row, col, e, solutions)
+                    solutions[j] = solutions[i]
+                    return pairs
 
             # Check the elements in the column after the current element
-            col_start = (row + 1) * 9 + col
-            for j in range(col_start, 81, 9):
+            col_continue = (row + 1) * 9 + col
+            for j in range(col_continue, 81, 9):
                 if solutions[i] == solutions[j]:
-                    pairs.append([i,j])
+                    pairs = [i,j]
+                    for e in solutions[i]:
+                        propagate_col(row, col, e, solutions)
+                    solutions[j] = solutions[i]
+                    return pairs
 
             # Check the elements in the Box after the current element
             box_r_start = (row // 3) * 3
             box_c_start = (col // 3) * 3
             for box_r in range(row, box_r_start + 3):
                 for box_c in range(col + 1, box_c_start + 3):
-                    if solutions[i] == solutions[9 * box_r + box_c]:
-                        pairs.append([i, 9 * box_r + box_c])
-
-    
+                    j = 9 * box_r + box_c
+                    if solutions[i] == solutions[j]:
+                        pairs = [i, j]
+                        for e in solutions[i]:
+                            propagate_box(row, e, solutions)
+                            solutions[j] = solutions[i]
+                            return pairs
 
     return pairs
+
+
 
 
 def solve_all():
@@ -168,4 +206,4 @@ def solve_one(s):
     print(board_to_string(solve(from_string(s))))
 
 
-solve_one("000100702030950000001002003590000301020000070703000098800200100000085060605009000")
+solve_one("000008020000006930098070001000000000009210000700000096240090000000300180000000003")

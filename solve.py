@@ -33,15 +33,19 @@ def solve(board):
     while(b):
         index = minimal_solution(solutions)
         current = solutions[index]
-        print(solutions)
 
-        if len(current) == 2:
-            print("Failure: Too many solutions")
         if len(current) == 1:
             r = index // 9
             c = index % 9
             board[r][c] = current[0]
             propagate(r, c, current[0], solutions)
+        if len(current) == 2:
+            pairs = propergate_pairs(solutions, index)
+            print("first pair: ", pairs, " values: ", solutions[pairs[0][0]], ", ", solutions[pairs[0][1]])
+            b = False
+            print("Failure: Too many solutions")
+
+            
         else:
             b = False
 
@@ -56,9 +60,7 @@ def minimal_solution(solutions):
     minimum = 0
     for i in range(len(solutions)):
         n_sols = len(solutions[i])  # Number of solutions for an element of the sudoku board
-        if n_sols == 0:
-            continue
-        if n_sols < min_s:          # Attempting to find element with minimal solutions
+        if (0 < n_sols and n_sols < min_s): # Attempting to find element with minimal solutions
             if n_sols == 1:
                 return i
             else:
@@ -101,7 +103,56 @@ def propagate(r, c, element, solutions):
     return solutions
 
 
+# Additional Heuristics
+def hidden_singles(solutions):
+    """
+    Find indexes that hold a unique solution in their column/row/box
+    """
+
+    return 0
+
+
+def propergate_pairs (solutions, index=0):
+    """
+    Find a pair of indexes that have a similar pair of solutions, 
+    then propergate the removal of those solutions
+    """
+    pairs = []
+
+    for i in range(index, len(solutions)):
+        if len(solutions[i]) == 2:
+            row = i // 9
+            col = i % 9
+
+            # check the elements in the row after the current element
+            row_end = ((i // 9) + 1) * 9
+            for j in range(i + 1, row_end):
+                if solutions[i] == solutions[j]:
+                    pairs.append([i,j])
+
+            # Check the elements in the column after the current element
+            col_start = (row + 1) * 9 + col
+            for j in range(col_start, 81, 9):
+                if solutions[i] == solutions[j]:
+                    pairs.append([i,j])
+
+            # Check the elements in the Box after the current element
+            box_r_start = (row // 3) * 3
+            box_c_start = (col // 3) * 3
+            for box_r in range(row, box_r_start + 3):
+                for box_c in range(col + 1, box_c_start + 3):
+                    if solutions[i] == solutions[9 * box_r + box_c]:
+                        pairs.append([i, 9 * box_r + box_c])
+
+    
+
+    return pairs
+
+
 def solve_all():
+    """
+    Takes the problems from 'problems.txt' and iterates solve over the list
+    """
     problem_file = open('problems.txt', 'r')
     problems = problem_file.readlines()
     count = 0
@@ -113,6 +164,7 @@ def solve_all():
 
 
 def solve_one(s):
+
     print(board_to_string(solve(from_string(s))))
 
 

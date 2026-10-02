@@ -49,7 +49,7 @@ impl Display for Cell {
         if self.bit_count() != 1 {
             write!(f, ".")
         } else {
-            let value = self.value.ilog2();
+            let value = self.value.ilog2() + 1;
             write!(f, "{}", value)
         }
     }
@@ -104,7 +104,8 @@ impl Sudoku {
         box_rows.join("-----+-----+-----\n")
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(&mut self) -> u32 {
+        let mut steps = 0;
         loop {
             let Some(index) = self.min_index() else {
                 println!("Solved");
@@ -114,9 +115,11 @@ impl Sudoku {
             if min_value == 0 {
                 panic!("Can't solve.")
             }
-            println!("{}, {:b}", index, &self.cells[index].value);
+            println!("Solve step {steps}: {index}, {min_value:b}");
             self.reduce(index);
+            steps += 1;
         }
+        steps
     }
 
     fn position(index: usize) -> (usize, usize) {
@@ -127,9 +130,14 @@ impl Sudoku {
 
     fn reduce(&mut self, index: usize) {
         let (row, col) = Sudoku::position(index);
-        self.reduce_row(row, self.read_row(row));
-        self.reduce_col(col, self.read_col(col));
-        self.reduce_box(row, col, self.read_box(row, col));
+        let used_row = self.read_row(row);
+        let used_col = self.read_col(col);
+        let used_box = self.read_box(row, col);
+        let used = used_row | used_col | used_box;
+        self.cells[index].value = !used & 0b111111111;
+        // self.reduce_row(row, self.read_row(row));
+        // self.reduce_col(col, self.read_col(col));
+        // self.reduce_box(row, col, self.read_box(row, col));
     }
 
     fn read_col(&self, col: usize) -> u32 {
@@ -146,9 +154,9 @@ impl Sudoku {
     fn reduce_col(&mut self, col: usize, used_values: u32) {
         for row in 0..9 {
             let index = row * 9 + col;
-            self.cells[index] = Cell {
-                value: self.cells[index].value & !used_values,
-            };
+            if !self.cells[index].is_resolved() {
+                self.cells[index].value &= !used_values;
+            }
         }
     }
 
@@ -168,8 +176,8 @@ impl Sudoku {
     fn reduce_row(&mut self, row: usize, used_values: u32) {
         let start = row * 9;
         for index in start..start + 9 {
-            self.cells[index] = Cell {
-                value: self.cells[index].value & !used_values,
+            if !self.cells[index].is_resolved() {
+                self.cells[index].value &= !used_values;
             }
         }
     }
@@ -180,8 +188,10 @@ impl Sudoku {
         let col_start = col / 3 * 3;
         for r in row_start..row_start + 3 {
             for c in col_start..col_start + 3 {
-                let index = r * 9 + c;
-                used_values |= self.cells[index].value;
+                let cell = &self.cells[r * 9 + c];
+                if cell.is_resolved() {
+                    used_values |= cell.value;
+                }
             }
         }
         used_values
@@ -193,26 +203,25 @@ impl Sudoku {
         for r in row_start..row_start + 3 {
             for c in col_start..col_start + 3 {
                 let index = r * 9 + c;
-                self.cells[index] = Cell {
-                    value: self.cells[index].value & !used_values,
+                if !self.cells[index].is_resolved() {
+                    self.cells[index].value &= !used_values;
                 }
             }
         }
     }
 
     fn min_index(&self) -> Option<usize> {
-        let mut i = 0;
-        let mut min = 0;
+        let mut min = 1024;
         let mut min_i = None;
-        for cell in &self.cells {
+        for (i, cell) in self.cells.iter().enumerate() {
             if cell.is_resolved() {
                 continue;
             }
-            if min == 0 || cell.bit_count() < min {
-                min = cell.bit_count();
+            let count = cell.bit_count();
+            if count < min {
+                min = count;
                 min_i = Some(i);
             }
-            i += 1
         }
         min_i
     }
@@ -224,13 +233,21 @@ fn main() {
     let solution =
         "467192835912835647385647192296351478748926351531478926873264519624519783159783264";
 
-    let c = Cell::from_char('0');
+    let c = Cell { value: 0b010011111 }; // Cell::from_char('5');
     println!("{}", c.value);
-    println!("{}", c.to_string());
+    println!("{c}");
+    println!("{}", c.is_resolved());
+    println!("{}", c.bit_count());
 
     let mut s = Sudoku::from_str(puzzle).expect("Bad input");
     println!("{}", s.to_string());
     println!("{}", s.to_pretty_string());
-    s.solve();
+    println!(
+        "{:16b}\n{:16b}\n{:16b}",
+        s.read_row(0),
+        s.read_col(4),
+        s.read_box(0, 4)
+    );
+    let steps = s.solve();
     println!("{}", s.to_pretty_string());
 }

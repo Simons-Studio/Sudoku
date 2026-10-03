@@ -1,7 +1,7 @@
 //! This is the Sudoku library
 
 use core::panic;
-use std::fmt::Display;
+use std::{fmt::Display, thread::sleep, time::Duration};
 
 #[derive(Copy, Clone)]
 struct Cell {
@@ -152,50 +152,56 @@ impl Sudoku {
         box_rows.join("-----+-----+-----\n")
     }
 
-    pub fn solve(&mut self) {
+    pub fn pretty_solve(&mut self) {
         self.initialise_options();
         let mut steps: Vec<Step> = Vec::new();
         loop {
-            let Some(index) = self.min_index() else {
-                println!("Solved");
+            let Some(line) = self.solve_step(&mut steps) else {
+                println!("{}", self.to_pretty_string());
                 break;
             };
-            let old_state = self.cells[index];
-            if old_state.value == 0 {
-                panic!("Invalid Puzzle.")
-            }
-            let options = Cell {
-                value: self.get_options(index),
+            println!("{line}\n{}", self.to_pretty_string());
+            sleep(Duration::from_millis(500));
+        }
+    }
+
+    pub fn solve(&mut self) {
+        self.initialise_options();
+        let mut steps: Vec<Step> = Vec::new();
+        while self.solve_step(&mut steps).is_some() {}
+    }
+
+    fn solve_step(&mut self, mut steps: &mut Vec<Step>) -> Option<String> {
+        let Some(index) = self.min_index() else {
+            println!("Solved!\n{}", self.to_pretty_string());
+            return None;
+        };
+        let old_state = self.cells[index];
+        if old_state.value == 0 {
+            panic!("Invalid Puzzle.")
+        }
+        let options = Cell {
+            value: self.get_options(index),
+        };
+        if options.bit_count() > 0 {
+            let choice = options.value & !(options.value - 1);
+            let new_state = Cell { value: choice };
+            let step = Step {
+                index,
+                old_state,
+                new_state,
+                other_choices: options.value & !choice,
             };
-            if options.bit_count() == 1 {
-                let step = Step {
-                    index,
-                    old_state,
-                    new_state: options,
-                    other_choices: 0,
-                };
-                //println!("+{:04} | {step}", steps.len());
-                steps.push(step);
-                self.cells[index] = options
-            } else if options.bit_count() > 1 {
-                let choice = options.value & !(options.value - 1);
-                let new_state = Cell { value: choice };
-                let step = Step {
-                    index,
-                    old_state,
-                    new_state,
-                    other_choices: options.value & !choice,
-                };
-                println!("+{:04} | {step}", steps.len());
-                steps.push(step);
-                self.cells[index] = new_state;
-            } else {
-                // Step back up
-                let back_count = self
-                    .step_back(&mut steps)
-                    .expect("Stepped all the way back with not soltion.");
-                println!("-{back_count:04} | {}", steps.last().unwrap());
-            }
+            let s = format!("+{:04} | {step}", steps.len());
+            steps.push(step);
+            self.cells[index] = new_state;
+            Some(s)
+        } else {
+            // Step back up
+            let back_count = self
+                .step_back(&mut steps)
+                .expect("Stepped all the way back with no solution.");
+            Some(format!("-{back_count:04} | {}", steps.last().unwrap()))
         }
     }
 
@@ -230,10 +236,6 @@ impl Sudoku {
         let col_index = index % 9;
         let row_index = index / 9;
         (row_index, col_index)
-    }
-
-    fn reduce(&mut self, index: usize, used_values: u32) {
-        self.cells[index].value = !used_values & 0b111111111;
     }
 
     fn get_options(&self, index: usize) -> u32 {

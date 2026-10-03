@@ -13,12 +13,12 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let file = fs::read_to_string("test_puzzles")?;
-    for line in file.lines() {
+    for (i, line) in file.lines().enumerate() {
         let Some(puzzle) = line.split(":").next() else {
             continue;
         };
         let mut s = Sudoku::from_str(puzzle)?;
-        println!("Puzzle:\n{}", s.to_pretty_string());
+        println!("Puzzle {i}:\n{}", s.to_pretty_string());
         s.solve();
     }
     Ok(())

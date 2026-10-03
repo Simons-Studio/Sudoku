@@ -1,5 +1,6 @@
 //! This is the Sudoku library
 
+use core::panic;
 use std::fmt::Display;
 
 #[derive(Copy, Clone)]
@@ -64,6 +65,49 @@ fn cells_to_string(cells: &[Cell]) -> String {
     cell_strs.join(" ")
 }
 
+struct Step {
+    index: usize,
+    old_state: Cell,
+    new_state: Cell,
+    other_choices: u32,
+}
+
+impl Display for Step {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let prefix = if self.other_choices > 0 {
+            "Choice"
+        } else {
+            "Single"
+        };
+        write!(
+            f,
+            "{prefix} {:02}: {:9b} -> {}",
+            self.index,
+            self.other_choices | self.new_state.value,
+            self.new_state
+        )
+    }
+}
+
+impl Step {
+    fn is_choice(&self) -> bool {
+        self.other_choices > 0
+    }
+
+    fn next_choice(self) -> Option<Self> {
+        if self.other_choices == 0 {
+            return None;
+        }
+        let new_choice = self.other_choices & !(self.other_choices - 1);
+        Some(Step {
+            index: self.index,
+            old_state: self.old_state,
+            new_state: Cell { value: new_choice },
+            other_choices: self.other_choices & !new_choice,
+        })
+    }
+}
+
 #[derive(Clone)]
 pub struct Sudoku {
     cells: Vec<Cell>,
@@ -108,22 +152,78 @@ impl Sudoku {
         box_rows.join("-----+-----+-----\n")
     }
 
-    pub fn solve(&mut self) -> u32 {
-        let mut steps = 0;
+    pub fn solve(&mut self) {
+        self.initialise_options();
+        let mut steps: Vec<Step> = Vec::new();
         loop {
             let Some(index) = self.min_index() else {
                 println!("Solved");
                 break;
             };
-            let min_value = self.cells[index].value;
-            if min_value == 0 {
-                panic!("Can't solve.")
+            let old_state = self.cells[index];
+            if old_state.value == 0 {
+                panic!("Invalid Puzzle.")
             }
-            println!("Solve step {steps}: {index}, {min_value:b}");
-            self.reduce(index);
-            steps += 1;
+            let options = Cell {
+                value: self.get_options(index),
+            };
+            if options.bit_count() == 1 {
+                let step = Step {
+                    index,
+                    old_state,
+                    new_state: options,
+                    other_choices: 0,
+                };
+                //println!("+{:04} | {step}", steps.len());
+                steps.push(step);
+                self.cells[index] = options
+            } else if options.bit_count() > 1 {
+                let choice = options.value & !(options.value - 1);
+                let new_state = Cell { value: choice };
+                let step = Step {
+                    index,
+                    old_state,
+                    new_state,
+                    other_choices: options.value & !choice,
+                };
+                println!("+{:04} | {step}", steps.len());
+                steps.push(step);
+                self.cells[index] = new_state;
+            } else {
+                // Step back up
+                let back_count = self
+                    .step_back(&mut steps)
+                    .expect("Stepped all the way back with not soltion.");
+                println!("-{back_count:04} | {}", steps.last().unwrap());
+            }
         }
-        steps
+    }
+
+    fn step_back(&mut self, steps: &mut Vec<Step>) -> Option<u32> {
+        let mut step_count = 0;
+        loop {
+            let Some(step) = steps.pop() else {
+                return None;
+            };
+            if step.is_choice() {
+                let next_step = step.next_choice().unwrap();
+                self.cells[next_step.index] = next_step.new_state;
+                steps.push(next_step);
+                return Some(step_count);
+            }
+            self.cells[step.index] = step.old_state;
+            step_count += 1;
+        }
+    }
+
+    fn initialise_options(&mut self) {
+        for i in 0..9 {
+            self.reduce_row(i, self.read_row(i));
+            self.reduce_col(i, self.read_col(i));
+            let box_row = i / 3 * 3;
+            let box_col = i % 3 * 3;
+            self.reduce_box(box_row, box_col, self.read_box(box_row, box_col));
+        }
     }
 
     fn position(index: usize) -> (usize, usize) {
@@ -132,24 +232,16 @@ impl Sudoku {
         (row_index, col_index)
     }
 
-    fn reduce(&mut self, index: usize) {
-        let (row, col) = Sudoku::position(index);
-        // let used_row = self.read_row(row);
-        // let used_col = self.read_col(col);
-        // let used_box = self.read_box(row, col);
-        // let used = used_row | used_col | used_box;
-        // self.cells[index].value = !used & 0b111111111;
-        self.reduce_row(row, self.read_row(row));
-        self.reduce_col(col, self.read_col(col));
-        self.reduce_box(row, col, self.read_box(row, col));
+    fn reduce(&mut self, index: usize, used_values: u32) {
+        self.cells[index].value = !used_values & 0b111111111;
     }
 
-    fn read_used(&self, index: usize) -> u32 {
+    fn get_options(&self, index: usize) -> u32 {
         let (row, col) = Sudoku::position(index);
         let used_row = self.read_row(row);
         let used_col = self.read_col(col);
         let used_box = self.read_box(row, col);
-        used_row | used_col | used_box
+        0b111111111 & !(used_row | used_col | used_box)
     }
 
     fn read_col(&self, col: usize) -> u32 {

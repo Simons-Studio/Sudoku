@@ -19,8 +19,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         };
         let mut s = Sudoku::from_str(puzzle)?;
         println!("Puzzle:\n{}", s.to_pretty_string());
-        let steps = s.solve();
-        println!("Solution in {steps} steps:\n{}", s.to_pretty_string());
+        s.solve();
     }
     Ok(())
 }

@@ -224,13 +224,15 @@ impl Sudoku {
             }
         } else {
             // Step back up
-            let back_count = self
-                .step_back(&mut steps)
-                .expect("Stepped all the way back with no solution.");
-            let message = format!("-{back_count:04} | {}", steps.last().unwrap());
-            StepReturn {
-                is_solution: Some(false),
-                message,
+            match self.step_back(&mut steps) {
+                Some(num) => StepReturn {
+                    is_solution: None,
+                    message: format!("-{num:04} | {}", steps.last().unwrap()),
+                },
+                None => StepReturn {
+                    is_solution: Some(false),
+                    message: String::from("Stepped all the way back with no solution."),
+                },
             }
         }
     }

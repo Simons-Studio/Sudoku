@@ -19,7 +19,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         };
         let s = Sudoku::from_str(puzzle)?;
         println!("Puzzle {i}:\n{}", s.to_pretty_string());
-        match s.pretty_solve() {
+        match s.solve() {
             Some(solution) => println!("Solved with solution:\n{}", solution.to_pretty_string()),
             None => println!("No solution to this puzzle."),
         }

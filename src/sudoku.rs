@@ -108,6 +108,11 @@ impl Step {
     }
 }
 
+struct StepReturn {
+    is_solution: Option<bool>,
+    message: String,
+}
+
 #[derive(Clone)]
 pub struct Sudoku {
     cells: Vec<Cell>,
@@ -152,29 +157,47 @@ impl Sudoku {
         box_rows.join("-----+-----+-----\n")
     }
 
-    pub fn pretty_solve(&mut self) {
+    pub fn pretty_solve(mut self) -> Option<Self> {
         self.initialise_options();
         let mut steps: Vec<Step> = Vec::new();
         loop {
-            let Some(line) = self.solve_step(&mut steps) else {
-                println!("{}", self.to_pretty_string());
-                break;
+            let step = self.solve_step(&mut steps);
+            let Some(solution) = step.is_solution else {
+                println!("{}\n{}", step.message, self.to_pretty_string());
+                sleep(Duration::from_millis(250));
+                continue;
             };
-            println!("{line}\n{}", self.to_pretty_string());
-            sleep(Duration::from_millis(500));
+            if solution {
+                break Some(self);
+            } else {
+                break None;
+            }
         }
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(mut self) -> Option<Self> {
         self.initialise_options();
         let mut steps: Vec<Step> = Vec::new();
-        while self.solve_step(&mut steps).is_some() {}
+        loop {
+            let step = self.solve_step(&mut steps);
+            let Some(solution) = step.is_solution else {
+                continue;
+            };
+            if solution {
+                break Some(self);
+            } else {
+                break None;
+            }
+        }
     }
 
-    fn solve_step(&mut self, mut steps: &mut Vec<Step>) -> Option<String> {
+    fn solve_step(&mut self, mut steps: &mut Vec<Step>) -> StepReturn {
         let Some(index) = self.min_index() else {
             println!("Solved!\n{}", self.to_pretty_string());
-            return None;
+            return StepReturn {
+                is_solution: Some(true),
+                message: String::from("Solved"),
+            };
         };
         let old_state = self.cells[index];
         if old_state.value == 0 {
@@ -192,16 +215,23 @@ impl Sudoku {
                 new_state,
                 other_choices: options.value & !choice,
             };
-            let s = format!("+{:04} | {step}", steps.len());
+            let message = format!("+{:04} | {step}", steps.len());
             steps.push(step);
             self.cells[index] = new_state;
-            Some(s)
+            StepReturn {
+                is_solution: None,
+                message,
+            }
         } else {
             // Step back up
             let back_count = self
                 .step_back(&mut steps)
                 .expect("Stepped all the way back with no solution.");
-            Some(format!("-{back_count:04} | {}", steps.last().unwrap()))
+            let message = format!("-{back_count:04} | {}", steps.last().unwrap());
+            StepReturn {
+                is_solution: Some(false),
+                message,
+            }
         }
     }
 
@@ -353,12 +383,12 @@ mod test {
     fn sudoku_easy_test() {
         let solution =
             "467192835912835647385647192296351478748926351531478926873264519624519783159783264";
-        let mut s = Sudoku::from_str(
+        let s = Sudoku::from_str(
             "467100805912835607085647192296351470708920351531408926073064510624519783159783064",
         )
         .expect("Bad String");
-        s.solve();
-        assert_eq!(s.to_string(), String::from(solution));
+        let solved = s.solve().expect("No solution.");
+        assert_eq!(solved.to_string(), String::from(solution));
     }
 
     #[test]

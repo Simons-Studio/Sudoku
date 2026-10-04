@@ -17,9 +17,12 @@ fn run() -> Result<(), Box<dyn Error>> {
         let Some(puzzle) = line.split(":").next() else {
             continue;
         };
-        let mut s = Sudoku::from_str(puzzle)?;
+        let s = Sudoku::from_str(puzzle)?;
         println!("Puzzle {i}:\n{}", s.to_pretty_string());
-        s.solve();
+        match s.pretty_solve() {
+            Some(solution) => println!("Solved with solution:\n{}", solution.to_pretty_string()),
+            None => println!("No solution to this puzzle."),
+        }
     }
     Ok(())
 }

@@ -193,7 +193,6 @@ impl Sudoku {
 
     fn solve_step(&mut self, mut steps: &mut Vec<Step>) -> StepReturn {
         let Some(index) = self.min_index() else {
-            println!("Solved!\n{}", self.to_pretty_string());
             return StepReturn {
                 is_solution: Some(true),
                 message: String::from("Solved"),

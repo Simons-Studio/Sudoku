@@ -13,7 +13,7 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let file = fs::read_to_string("test_puzzles")?;
-    for (i, line) in file.lines().enumerate() {
+    for (i, line) in file.lines().rev().enumerate() {
         let Some(puzzle) = line.split(":").next() else {
             continue;
         };

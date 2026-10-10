@@ -13,12 +13,12 @@ impl<T> Queue<T> {
         }
     }
 
-    fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
         let mut queue = self.data.lock().unwrap();
         queue.pop()
     }
 
-    fn push(&mut self, value: T) {
+    pub fn push(&mut self, value: T) {
         let mut queue = self.data.lock().unwrap();
         queue.push(value);
     }
